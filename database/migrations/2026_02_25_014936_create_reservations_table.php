@@ -12,9 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('reservations', function (Blueprint $table) {
-            $table->id();
-            $table->timestamps();
-        });
+        $table->id();
+        $table->foreignId('table_id')->constrained()->onDelete('cascade');
+        $table->string('customer_name');
+        $table->datetime('reservation_time');
+        $table->enum('status', ['pending', 'confirmed', 'completed'])->default('pending');
+        $table->timestamps();
+    });
     }
 
     /**
