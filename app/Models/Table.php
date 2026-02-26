@@ -12,5 +12,9 @@ class Table extends Model
     'table_number',
     'capacity',
     'status'
-];
+    ];
+    public function reservations()
+    {
+        return $this->hasMany(\App\Models\Reservation::class);
+    }
 }
