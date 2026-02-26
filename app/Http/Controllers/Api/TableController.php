@@ -41,6 +41,6 @@ class TableController extends Controller
     public function destroy($id)
     {
         Table::destroy($id);
-        return response()->json(['message' => 'Deleted']);
+        return response()->json(['message' => 'data berhasil dihapus']);
     }
 }

@@ -2,52 +2,73 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 
+// State untuk Menu
 const menus = ref([])
-const form = ref({
+const menuForm = ref({
   id: null,
   name: '',
   price: '',
   stock: ''
 })
+const isEditMenu = ref(false)
 
-const isEdit = ref(false)
+// State untuk Meja
+const tables = ref([])
+const tableForm = ref({
+  id: null,
+  table_number: '',
+  capacity: '',
+  status: 'available'
+})
+const isEditTable = ref(false)
 
+// Fetch data
 const fetchMenus = async () => {
   try {
     const res = await axios.get('http://localhost:8000/api/menus')
     menus.value = res.data
   } catch (error) {
-    console.error('Error fetching menus:', error)
-    alert('Gagal memuat data menu')
+    console.error('Error:', error)
+    alert('Gagal memuat menu')
   }
 }
 
-onMounted(fetchMenus)
-
-const submitForm = async () => {
+const fetchTables = async () => {
   try {
-    if (isEdit.value) {
-      await axios.put(
-        `http://localhost:8000/api/menus/${form.value.id}`,
-        form.value
-      )
+    const res = await axios.get('http://localhost:8000/api/tables')
+    tables.value = res.data
+  } catch (error) {
+    console.error('Error:', error)
+    alert('Gagal memuat meja')
+  }
+}
+
+onMounted(() => {
+  fetchMenus()
+  fetchTables()
+})
+
+// Fungsi untuk Menu
+const submitMenu = async () => {
+  try {
+    if (isEditMenu.value) {
+      await axios.put(`http://localhost:8000/api/menus/${menuForm.value.id}`, menuForm.value)
       alert('Menu berhasil diupdate!')
     } else {
-      await axios.post('http://localhost:8000/api/menus', form.value)
+      await axios.post('http://localhost:8000/api/menus', menuForm.value)
       alert('Menu berhasil ditambahkan!')
     }
-
-    resetForm()
+    resetMenuForm()
     fetchMenus()
   } catch (error) {
-    console.error('Error saving menu:', error)
+    console.error('Error:', error)
     alert('Gagal menyimpan menu')
   }
 }
 
 const editMenu = (menu) => {
-  form.value = { ...menu }
-  isEdit.value = true
+  menuForm.value = { ...menu }
+  isEditMenu.value = true
 }
 
 const deleteMenu = async (id) => {
@@ -57,454 +78,312 @@ const deleteMenu = async (id) => {
       alert('Menu berhasil dihapus!')
       fetchMenus()
     } catch (error) {
-      console.error('Error deleting menu:', error)
+      console.error('Error:', error)
       alert('Gagal menghapus menu')
     }
   }
 }
 
-const resetForm = () => {
-  form.value = {
-    id: null,
-    name: '',
-    price: '',
-    stock: ''
-  }
-  isEdit.value = false
+const resetMenuForm = () => {
+  menuForm.value = { id: null, name: '', price: '', stock: '' }
+  isEditMenu.value = false
 }
 
+// Fungsi untuk Meja
+const submitTable = async () => {
+  try {
+    if (isEditTable.value) {
+      await axios.put(`http://localhost:8000/api/tables/${tableForm.value.id}`, tableForm.value)
+      alert('Meja berhasil diupdate!')
+    } else {
+      await axios.post('http://localhost:8000/api/tables', tableForm.value)
+      alert('Meja berhasil ditambahkan!')
+    }
+    resetTableForm()
+    fetchTables()
+  } catch (error) {
+    console.error('Error:', error)
+    alert('Gagal menyimpan meja')
+  }
+}
+
+const editTable = (table) => {
+  tableForm.value = { ...table }
+  isEditTable.value = true
+}
+
+const deleteTable = async (id) => {
+  if (confirm('Yakin ingin menghapus meja ini?')) {
+    try {
+      await axios.delete(`http://localhost:8000/api/tables/${id}`)
+      alert('Meja berhasil dihapus!')
+      fetchTables()
+    } catch (error) {
+      console.error('Error:', error)
+      alert('Gagal menghapus meja')
+    }
+  }
+}
+
+const resetTableForm = () => {
+  tableForm.value = { id: null, table_number: '', capacity: '', status: 'available' }
+  isEditTable.value = false
+}
+
+// Helper
 const formatPrice = (price) => {
   return new Intl.NumberFormat('id-ID').format(price)
 }
 </script>
 
 <template>
-  <div class="admin-container">
-    <div class="header">
-      <h1>🍽️ Admin Menu</h1>
-      <p>Kelola menu makanan Anda dengan mudah</p>
+  <div class="container">
+    <h1>🍽️ Admin Panel</h1>
+    
+    <!-- Section Menu -->
+    <div class="section">
+      <h2>📋 Manajemen Menu</h2>
+      
+      <!-- Form Menu -->
+      <form @submit.prevent="submitMenu" class="form">
+        <input v-model="menuForm.name" placeholder="Nama Menu" required />
+        <input v-model="menuForm.price" type="number" placeholder="Harga" required />
+        <input v-model="menuForm.stock" type="number" placeholder="Stok" required />
+        <div class="actions">
+          <button type="submit" class="btn-primary">{{ isEditMenu ? 'Update' : 'Simpan' }} Menu</button>
+          <button type="button" @click="resetMenuForm" class="btn-secondary">Reset</button>
+        </div>
+      </form>
+
+      <!-- Tabel Menu -->
+      <table v-if="menus.length > 0">
+        <thead>
+          <tr>
+            <th>Nama</th>
+            <th>Harga</th>
+            <th>Stok</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="menu in menus" :key="menu.id">
+            <td>{{ menu.name }}</td>
+            <td>Rp {{ formatPrice(menu.price) }}</td>
+            <td>
+              <span :class="['stock', menu.stock <= 5 ? 'low' : '']">
+                {{ menu.stock }}
+              </span>
+            </td>
+            <td>
+              <button @click="editMenu(menu)" class="btn-edit">Edit</button>
+              <button @click="deleteMenu(menu.id)" class="btn-delete">Hapus</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-else class="empty">Belum ada menu</p>
     </div>
 
-    <div class="content-wrapper">
-      <!-- FORM SECTION -->
-      <div class="form-section">
-        <div class="section-title">
-          <h2>{{ isEdit ? '✏️ Edit Menu' : '➕ Tambah Menu Baru' }}</h2>
+    <!-- Section Meja -->
+    <div class="section">
+      <h2>🪑 Manajemen Meja</h2>
+      
+      <!-- Form Meja -->
+      <form @submit.prevent="submitTable" class="form">
+        <input v-model="tableForm.table_number" placeholder="Nomor Meja" required />
+        <input v-model="tableForm.capacity" type="number" placeholder="Kapasitas" required />
+        <select v-model="tableForm.status">
+          <option value="available">Tersedia</option>
+          <option value="reserved">Dipesan</option>
+        </select>
+        <div class="actions">
+          <button type="submit" class="btn-primary">{{ isEditTable ? 'Update' : 'Simpan' }} Meja</button>
+          <button type="button" @click="resetTableForm" class="btn-secondary">Reset</button>
         </div>
-        
-        <form @submit.prevent="submitForm" class="menu-form">
-          <div class="form-group">
-            <label for="name">Nama Menu</label>
-            <input 
-              id="name"
-              v-model="form.name" 
-              type="text"
-              placeholder="Masukkan nama menu"
-              required 
-            />
-          </div>
+      </form>
 
-          <div class="form-row">
-            <div class="form-group">
-              <label for="price">Harga (Rp)</label>
-              <input 
-                id="price"
-                v-model="form.price" 
-                type="number" 
-                placeholder="0"
-                min="0"
-                required 
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="stock">Stok</label>
-              <input 
-                id="stock"
-                v-model="form.stock" 
-                type="number" 
-                placeholder="0"
-                min="0"
-                required 
-              />
-            </div>
-          </div>
-
-          <div class="form-actions">
-            <button type="submit" class="btn btn-primary">
-              {{ isEdit ? 'Update Menu' : 'Simpan Menu' }}
-            </button>
-            <button type="button" class="btn btn-secondary" @click="resetForm">
-              Reset
-            </button>
-          </div>
-        </form>
-      </div>
-
-      <!-- LIST SECTION -->
-      <div class="list-section">
-        <div class="section-title">
-          <h2>📋 Daftar Menu</h2>
-          <span class="menu-count">{{ menus.length }} menu</span>
-        </div>
-
-        <div v-if="menus.length === 0" class="empty-state">
-          <p>Belum ada menu tersedia</p>
-          <p class="empty-sub">Tambahkan menu baru menggunakan form di samping</p>
-        </div>
-
-        <div v-else class="table-responsive">
-          <table class="menu-table">
-            <thead>
-              <tr>
-                <th>No</th>
-                <th>Nama Menu</th>
-                <th>Harga</th>
-                <th>Stok</th>
-                <th>Status</th>
-                <th>Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(menu, index) in menus" :key="menu.id">
-                <td>{{ index + 1 }}</td>
-                <td class="menu-name">{{ menu.name }}</td>
-                <td class="menu-price">Rp {{ formatPrice(menu.price) }}</td>
-                <td>
-                  <span :class="['stock-badge', { 'stock-low': menu.stock <= 5 }]">
-                    {{ menu.stock }}
-                  </span>
-                </td>
-                <td>
-                  <span :class="['status-badge', menu.stock > 0 ? 'status-available' : 'status-empty']">
-                    {{ menu.stock > 0 ? 'Tersedia' : 'Habis' }}
-                  </span>
-                </td>
-                <td class="action-buttons">
-                  <button @click="editMenu(menu)" class="btn-edit">
-                    Edit
-                  </button>
-                  <button @click="deleteMenu(menu.id)" class="btn-delete">
-                    Hapus
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <!-- Tabel Meja -->
+      <table v-if="tables.length > 0">
+        <thead>
+          <tr>
+            <th>No Meja</th>
+            <th>Kapasitas</th>
+            <th>Status</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="table in tables" :key="table.id">
+            <td>Meja {{ table.table_number }}</td>
+            <td>{{ table.capacity }} orang</td>
+            <td>
+              <span :class="['status', table.status]">
+                {{ table.status === 'available' ? 'Tersedia' : 'Dipesan' }}
+              </span>
+            </td>
+            <td>
+              <button @click="editTable(table)" class="btn-edit">Edit</button>
+              <button @click="deleteTable(table.id)" class="btn-delete">Hapus</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-else class="empty">Belum ada meja</p>
     </div>
   </div>
 </template>
 
 <style scoped>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-.admin-container {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 40px 20px;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
-
-.header {
-  max-width: 1400px;
-  margin: 0 auto 40px;
-  color: white;
-}
-
-.header h1 {
-  font-size: 2.5rem;
-  margin-bottom: 10px;
-  font-weight: 600;
-}
-
-.header p {
-  font-size: 1.1rem;
-  opacity: 0.9;
-}
-
-.content-wrapper {
-  max-width: 1400px;
+.container {
+  max-width: 1200px;
   margin: 0 auto;
-  display: grid;
-  grid-template-columns: 380px 1fr;
-  gap: 30px;
+  padding: 20px;
+  font-family: Arial, sans-serif;
 }
 
-/* Form Section */
-.form-section {
-  background: white;
-  border-radius: 20px;
-  padding: 25px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-  height: fit-content;
-}
-
-.section-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 25px;
-  padding-bottom: 15px;
-  border-bottom: 2px solid #f0f0f0;
-}
-
-.section-title h2 {
-  font-size: 1.3rem;
+h1 {
   color: #333;
-  font-weight: 600;
+  margin-bottom: 30px;
 }
 
-.menu-count {
-  background: #667eea;
-  color: white;
-  padding: 5px 10px;
-  border-radius: 20px;
-  font-size: 0.9rem;
+.section {
+  background: #f9f9f9;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 30px;
 }
 
-.menu-form {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.form-group label {
-  font-size: 0.9rem;
-  font-weight: 600;
+.section h2 {
   color: #555;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #ddd;
 }
 
-.form-group input {
-  padding: 12px 15px;
-  border: 2px solid #e0e0e0;
-  border-radius: 10px;
-  font-size: 1rem;
-  transition: all 0.3s ease;
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.form-group input::placeholder {
-  color: #999;
-}
-
-.form-row {
+.form {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
-}
-
-.form-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 10px;
-  margin-top: 10px;
+  margin-bottom: 20px;
 }
 
-.btn {
-  padding: 12px 20px;
+.form input, .form select {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  grid-column: 1 / -1;
+}
+
+button {
+  padding: 10px 20px;
   border: none;
-  border-radius: 10px;
-  font-size: 1rem;
-  font-weight: 600;
+  border-radius: 4px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  font-size: 14px;
+  font-weight: bold;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #4CAF50;
   color: white;
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+  background: #45a049;
 }
 
 .btn-secondary {
   background: #f0f0f0;
-  color: #666;
+  color: #333;
 }
 
 .btn-secondary:hover {
   background: #e0e0e0;
 }
 
-/* List Section */
-.list-section {
-  background: white;
-  border-radius: 20px;
-  padding: 25px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+.btn-edit {
+  background: #2196F3;
+  color: white;
+  margin-right: 5px;
+  padding: 5px 10px;
 }
 
-.table-responsive {
-  overflow-x: auto;
+.btn-edit:hover {
+  background: #1976D2;
 }
 
-.menu-table {
+.btn-delete {
+  background: #f44336;
+  color: white;
+  padding: 5px 10px;
+}
+
+.btn-delete:hover {
+  background: #d32f2f;
+}
+
+table {
   width: 100%;
   border-collapse: collapse;
+  background: white;
 }
 
-.menu-table th {
-  background: #f8f9fa;
-  padding: 15px;
+th, td {
+  padding: 12px;
   text-align: left;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #555;
-  border-bottom: 2px solid #e0e0e0;
+  border-bottom: 1px solid #ddd;
 }
 
-.menu-table td {
-  padding: 15px;
-  border-bottom: 1px solid #f0f0f0;
-  color: #666;
-}
-
-.menu-table tbody tr:hover {
-  background: #f8f9fa;
-}
-
-.menu-name {
-  font-weight: 600;
+th {
+  background: #f2f2f2;
+  font-weight: bold;
   color: #333;
 }
 
-.menu-price {
-  font-weight: 600;
-  color: #667eea;
+tr:hover {
+  background: #f5f5f5;
 }
 
-.stock-badge {
-  display: inline-block;
-  padding: 5px 10px;
-  border-radius: 6px;
+.stock {
+  padding: 4px 8px;
+  border-radius: 4px;
   background: #e8f5e9;
   color: #2e7d32;
-  font-weight: 600;
 }
 
-.stock-low {
+.stock.low {
   background: #fff3e0;
   color: #ed6c02;
 }
 
-.status-badge {
-  display: inline-block;
-  padding: 5px 10px;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
+.status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
 }
 
-.status-available {
+.status.available {
   background: #e8f5e9;
   color: #2e7d32;
 }
 
-.status-empty {
+.status.reserved {
   background: #ffebee;
   color: #c62828;
 }
 
-.action-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-.btn-edit, .btn-delete {
-  padding: 6px 12px;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.btn-edit {
-  background: #e3f2fd;
-  color: #1976d2;
-}
-
-.btn-edit:hover {
-  background: #bbdefb;
-}
-
-.btn-delete {
-  background: #ffebee;
-  color: #c62828;
-}
-
-.btn-delete:hover {
-  background: #ffcdd2;
-}
-
-.empty-state {
+.empty {
   text-align: center;
-  padding: 60px 20px;
   color: #999;
-}
-
-.empty-state p:first-child {
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin-bottom: 10px;
-}
-
-.empty-sub {
-  font-size: 0.9rem;
-  opacity: 0.8;
-}
-
-/* Responsive */
-@media (max-width: 968px) {
-  .content-wrapper {
-    grid-template-columns: 1fr;
-  }
-  
-  .form-section {
-    order: 2;
-  }
-  
-  .list-section {
-    order: 1;
-  }
-}
-
-@media (max-width: 576px) {
-  .admin-container {
-    padding: 20px 10px;
-  }
-  
-  .header h1 {
-    font-size: 2rem;
-  }
-  
-  .form-row {
-    grid-template-columns: 1fr;
-  }
-  
-  .action-buttons {
-    flex-direction: column;
-  }
+  padding: 40px;
+  background: white;
+  border-radius: 4px;
 }
 </style>
