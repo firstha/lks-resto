@@ -22,6 +22,14 @@ const tableForm = ref({
 })
 const isEditTable = ref(false)
 
+// State untuk Reservasi
+const reservations = ref([])
+const reservationForm = ref({
+  table_id: '',
+  customer_name: '',
+  reservation_time: ''
+})
+
 // Fetch data
 const fetchMenus = async () => {
   try {
@@ -43,9 +51,20 @@ const fetchTables = async () => {
   }
 }
 
+const fetchReservations = async () => {
+  try {
+    const res = await axios.get('http://localhost:8000/api/reservations')
+    reservations.value = res.data
+  } catch (error) {
+    console.error('Error:', error)
+    alert('Gagal memuat reservasi')
+  }
+}
+
 onMounted(() => {
   fetchMenus()
   fetchTables()
+  fetchReservations()
 })
 
 // Fungsi untuk Menu
@@ -130,21 +149,55 @@ const resetTableForm = () => {
   isEditTable.value = false
 }
 
+// Fungsi untuk Reservasi
+const submitReservation = async () => {
+  try {
+    await axios.post('http://localhost:8000/api/reservations', reservationForm.value)
+    alert('Reservasi berhasil!')
+    fetchReservations()
+    fetchTables() // Refresh status meja
+    reservationForm.value = {
+      table_id: '',
+      customer_name: '',
+      reservation_time: ''
+    }
+  } catch (err) {
+    alert(err.response?.data?.message || 'Gagal membuat reservasi')
+  }
+}
+
+const deleteReservation = async (id) => {
+  if (confirm('Yakin ingin membatalkan reservasi ini?')) {
+    try {
+      await axios.delete(`http://localhost:8000/api/reservations/${id}`)
+      alert('Reservasi dibatalkan')
+      fetchReservations()
+      fetchTables() // Refresh status meja
+    } catch (error) {
+      console.error('Error:', error)
+      alert('Gagal membatalkan reservasi')
+    }
+  }
+}
+
 // Helper
 const formatPrice = (price) => {
   return new Intl.NumberFormat('id-ID').format(price)
+}
+
+const formatDateTime = (datetime) => {
+  return new Date(datetime).toLocaleString('id-ID')
 }
 </script>
 
 <template>
   <div class="container">
-    <h1>🍽️ Admin Panel</h1>
+    <h1>🍽️ Admin Panel - Restaurant Management</h1>
     
     <!-- Section Menu -->
     <div class="section">
       <h2>📋 Manajemen Menu</h2>
       
-      <!-- Form Menu -->
       <form @submit.prevent="submitMenu" class="form">
         <input v-model="menuForm.name" placeholder="Nama Menu" required />
         <input v-model="menuForm.price" type="number" placeholder="Harga" required />
@@ -155,7 +208,6 @@ const formatPrice = (price) => {
         </div>
       </form>
 
-      <!-- Tabel Menu -->
       <table v-if="menus.length > 0">
         <thead>
           <tr>
@@ -170,7 +222,7 @@ const formatPrice = (price) => {
             <td>{{ menu.name }}</td>
             <td>Rp {{ formatPrice(menu.price) }}</td>
             <td>
-              <span :class="['stock', menu.stock <= 5 ? 'low' : '']">
+              <span :class="['badge', menu.stock <= 5 ? 'badge-warning' : 'badge-success']">
                 {{ menu.stock }}
               </span>
             </td>
@@ -188,7 +240,6 @@ const formatPrice = (price) => {
     <div class="section">
       <h2>🪑 Manajemen Meja</h2>
       
-      <!-- Form Meja -->
       <form @submit.prevent="submitTable" class="form">
         <input v-model="tableForm.table_number" placeholder="Nomor Meja" required />
         <input v-model="tableForm.capacity" type="number" placeholder="Kapasitas" required />
@@ -202,7 +253,6 @@ const formatPrice = (price) => {
         </div>
       </form>
 
-      <!-- Tabel Meja -->
       <table v-if="tables.length > 0">
         <thead>
           <tr>
@@ -217,7 +267,7 @@ const formatPrice = (price) => {
             <td>Meja {{ table.table_number }}</td>
             <td>{{ table.capacity }} orang</td>
             <td>
-              <span :class="['status', table.status]">
+              <span :class="['badge', table.status === 'available' ? 'badge-success' : 'badge-danger']">
                 {{ table.status === 'available' ? 'Tersedia' : 'Dipesan' }}
               </span>
             </td>
@@ -229,6 +279,67 @@ const formatPrice = (price) => {
         </tbody>
       </table>
       <p v-else class="empty">Belum ada meja</p>
+    </div>
+
+    <!-- Section Reservasi -->
+    <div class="section">
+      <h2>📅 Manajemen Reservasi</h2>
+      
+      <form @submit.prevent="submitReservation" class="form">
+        <input 
+          v-model="reservationForm.customer_name" 
+          placeholder="Nama Customer" 
+          required 
+        />
+        
+        <select v-model="reservationForm.table_id" required>
+          <option value="">Pilih Meja</option>
+          <option 
+            v-for="table in tables" 
+            :key="table.id" 
+            :value="table.id"
+            :disabled="table.status === 'reserved'"
+          >
+            Meja {{ table.table_number }} ({{ table.capacity }} org) - 
+            {{ table.status === 'available' ? 'Tersedia' : 'Dipesan' }}
+          </option>
+        </select>
+
+        <input 
+          type="datetime-local" 
+          v-model="reservationForm.reservation_time" 
+          required 
+        />
+
+        <div class="actions">
+          <button type="submit" class="btn-primary">Buat Reservasi</button>
+          <button type="button" @click="reservationForm = { table_id: '', customer_name: '', reservation_time: '' }" class="btn-secondary">
+            Reset
+          </button>
+        </div>
+      </form>
+
+      <table v-if="reservations.length > 0">
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Meja</th>
+            <th>Waktu Reservasi</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="res in reservations" :key="res.id">
+            <td>{{ res.customer_name }}</td>
+            <td>Meja {{ res.table.table_number }} ({{ res.table.capacity }} org)</td>
+            <td>{{ formatDateTime(res.reservation_time) }}</td>
+            <td>
+              <button @click="deleteReservation(res.id)" class="btn-delete">Batalkan</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-else class="empty">Belum ada reservasi</p>
     </div>
   </div>
 </template>
@@ -244,6 +355,7 @@ const formatPrice = (price) => {
 h1 {
   color: #333;
   margin-bottom: 30px;
+  text-align: center;
 }
 
 .section {
@@ -251,6 +363,7 @@ h1 {
   border-radius: 8px;
   padding: 20px;
   margin-bottom: 30px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .section h2 {
@@ -265,6 +378,9 @@ h1 {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 10px;
   margin-bottom: 20px;
+  background: white;
+  padding: 15px;
+  border-radius: 6px;
 }
 
 .form input, .form select {
@@ -272,6 +388,11 @@ h1 {
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
+}
+
+.form input:focus, .form select:focus {
+  outline: none;
+  border-color: #4CAF50;
 }
 
 .actions {
@@ -287,6 +408,7 @@ button {
   cursor: pointer;
   font-size: 14px;
   font-weight: bold;
+  transition: all 0.3s;
 }
 
 .btn-primary {
@@ -332,6 +454,8 @@ table {
   width: 100%;
   border-collapse: collapse;
   background: white;
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 th, td {
@@ -350,31 +474,25 @@ tr:hover {
   background: #f5f5f5;
 }
 
-.stock {
-  padding: 4px 8px;
-  border-radius: 4px;
-  background: #e8f5e9;
-  color: #2e7d32;
-}
-
-.stock.low {
-  background: #fff3e0;
-  color: #ed6c02;
-}
-
-.status {
+.badge {
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 12px;
   font-weight: bold;
+  display: inline-block;
 }
 
-.status.available {
+.badge-success {
   background: #e8f5e9;
   color: #2e7d32;
 }
 
-.status.reserved {
+.badge-warning {
+  background: #fff3e0;
+  color: #ed6c02;
+}
+
+.badge-danger {
   background: #ffebee;
   color: #c62828;
 }
@@ -385,5 +503,19 @@ tr:hover {
   padding: 40px;
   background: white;
   border-radius: 4px;
+}
+
+@media (max-width: 768px) {
+  .form {
+    grid-template-columns: 1fr;
+  }
+  
+  table {
+    font-size: 14px;
+  }
+  
+  th, td {
+    padding: 8px;
+  }
 }
 </style>
